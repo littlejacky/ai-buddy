@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Buddy — Gate 0 五维准入探针 (v2.8)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 6px;
+      color: #38bdf8;
+    }
+    .desc {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .col {
+      flex: 1;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      background: #0f172a;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0369a1; }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .dimension {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .dimension .title {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .dimension .status {
+      font-size: 15px;
+      font-weight: bold;
+    }
+    .status-wait { color: #94a3b8; }
+    .status-running { color: #facc15; }
+    .status-pass { color: #4ade80; }
+    .status-fail { color: #f87171; }
+    pre {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      font-family: monospace;
+      max-height: 250px;
+      overflow-y: auto;
+      color: #cbd5e1;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: #38bdf8;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AI Buddy — Gate 0 五维准入探针 (v2.8)</h1>
+    <div class="desc">
+      执行 Gate 0 的五项硬性准入校验：HTTP 201、SDP Answer 语法、ICE Connected、DataChannel Open，以及 <strong>RTP 双向媒体数据包（上行+下行）统计验证</strong>。
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>Azure Endpoint</label>
+          <input id="endpoint" type="text" placeholder="https://<your-resource>.openai.azure.com" value="https://mxt-eus2.openai.azure.com">
+        </div>
+        <div class="col">
+          <label>Deployment Name (Deployment Name ≠ Model ID)</label>
+          <input id="deployment" type="text" placeholder="your-realtime-deployment" value="gpt-realtime-2.1">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label>API Key (仅在前端探针调试使用，生产由后端持有)</label>
+          <input id="apiKey" type="password" placeholder="Azure OpenAI API Key" value="">
+        </div>
+      </div>
+      <button id="btnRun" onclick="runGate0Probe()">开始 Gate 0 五维全链路探测</button>
+      <div class="stats-bar" id="statsBar">
+        <span>RTP 上行包: <strong id="outPackets">0</strong></span>
+        <span>RTP 下行包: <strong id="inPackets">0</strong></span>
+        <span>Candidate RTT: <strong id="candRtt">-</strong> ms</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight: 600; margin-bottom: 8px;">Gate 0 准入状态矩阵 (全部 PASS 方可准入 Gate 1)</div>
+      <div class="grid">
+        <div class="dimension">
+          <div class="title">1. /calls 响应状态 (HTTP 201)</div>
+          <div id="d1" class="status status-wait">等待测试</div>
+        </div>
+        <div class="dimension">
+          <div class="title">2. SDP Answer 语法与解析</div>
+          <div id="d2" class="status status-wait">等待测试</div>
+        </div>
+        <div class="dimension">
+          <div class="title">3. ICE 状态 (ICE Connected)</div>
+          <div id="d3" class="status status-wait">等待测试</div>
+        </div>
+        <div class="dimension">
+          <div class="title">4. DataChannel (oai-events Open)</div>
+          <div id="d4" class="status status-wait">等待测试</div>
+        </div>
+        <div class="dimension" style="grid-column: span 2;">
+          <div class="title">5. RTP 双向媒体流 (上行与下行包 > 0)</div>
+          <div id="d5" class="status status-wait">等待测试</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight: 600; margin-bottom: 8px;">探测执行日志</div>
+      <pre id="logArea">等待执行...</pre>
+    </div>
+  </div>
+
+  <script>
+    function log(msg) {
+      const el = document.getElementById('logArea');
+      el.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setDimension(id, state, text) {
+      const el = document.getElementById(id);
+      el.className = `status status-${state}`;
+      el.textContent = text;
+    }
+
+    let pc = null;
+    let dc = null;
+    let localStream = null;
+    let statsTimer = null;
+
+    async function runGate0Probe() {
+      const endpoint = document.getElementById('endpoint').value.trim().replace(/\/+$/, '');
+      const deployment = document.getElementById('deployment').value.trim();
+      const apiKey = document.getElementById('apiKey').value.trim();
+
+      if (!endpoint || !deployment || !apiKey) {
+        alert('请完整填写 Endpoint, Deployment Name 与 API Key！');
+        return;
+      }
+
+      document.getElementById('btnRun').disabled = true;
+      document.getElementById('logArea').textContent = '开始 Gate 0 五维探测 (v2.6)...';
+
+      setDimension('d1', 'running', '正在请求...');
+      setDimension('d2', 'wait', '等待中');
+      setDimension('d3', 'wait', '等待中');
+      setDimension('d4', 'wait', '等待中');
+      setDimension('d5', 'wait', '等待中');
+
+      try {
+        // ── 步骤 1: 请求 client_secrets (Minimal Schema, Expected: HTTP 200) ──
+        log(`[Step 1] 正在请求 POST ${endpoint}/openai/v1/realtime/client_secrets ...`);
+        const secretRes = await fetch(`${endpoint}/openai/v1/realtime/client_secrets`, {
+          method: 'POST',
+          headers: {
+            'api-key': apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            expires_after: { anchor: 'created_at', seconds: 600 },
+            session: { type: 'realtime', model: deployment }
+          })
+        });
+
+        if (secretRes.status !== 200) {
+          const errText = await secretRes.text();
+          throw new Error(`client_secrets 失败 (返回 HTTP ${secretRes.status}, 预期 200): ${errText}`);
+        }
+
+        const secretJson = await secretRes.json();
+        const ephemeralKey = secretJson.value || secretJson.client_secret?.value;
+        if (!ephemeralKey) {
+          throw new Error('未在返回中解析出 ephemeral key');
+        }
+        log(`[Step 1 PASS] 获取 Ephemeral Secret: ${ephemeralKey.substring(0, 10)}...`);
+
+        // ── 步骤 2: 申请麦克风以建立真实的 RTP 上行 ──
+        log('[Step 2] 正在申请本地麦克风以注入真实 RTP 音频轨道...');
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+        const audioTrack = localStream.getAudioTracks()[0];
+        // 时序防早发保护：先将 Track 静音，待 Session 配置确认后再解除静音
+        audioTrack.enabled = false;
+        log(`  -> 麦克风已就绪: ${audioTrack.label} (AEC: ${audioTrack.getSettings()?.echoCancellation})`);
+        log(`  -> [时序保护] 音轨初始设置为 enabled=false，防止配置生效前发送空音频`);
+
+        // ── 步骤 3: 初始化 PeerConnection 与 DataChannel ──
+        log('[Step 3] 初始化 RTCPeerConnection 与 DataChannel (oai-events)...');
+        pc = new RTCPeerConnection();
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+        // 绑定远程音轨并建立 Web Audio 振幅分析器
+        let remoteAudioDetected = false;
+        pc.ontrack = (evt) => {
+          log(`  -> 收到远端音轨: kind=${evt.track.kind}, id=${evt.track.id}`);
+          const audioEl = document.createElement('audio');
+          audioEl.srcObject = evt.streams[0];
+          audioEl.autoplay = true;
+          audioEl.setAttribute('playsinline', '');
+          audioEl.play().catch(e => console.warn('Autoplay prompt:', e));
+
+          // 创建 Web Audio Analyser 验证是否解码出非零真实音频
+          try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioCtx.createMediaStreamSource(evt.streams[0]);
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            const checkAudioInterval = setInterval(() => {
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+              if (sum > 0) {
+                remoteAudioDetected = true;
+                log(`  -> [真实音频解码] 检测到远端音频有效非零振幅 (energy sum=${sum})，确认物理发声！`);
+                clearInterval(checkAudioInterval);
+              }
+            }, 300);
+          } catch (e) {
+            console.warn('Web Audio Analyser init failed:', e);
+          }
+        };
+
+        // 维度 3: 监听 ICE 状态
+        pc.oniceconnectionstatechange = () => {
+          log(`  -> ICE 状态变迁: ${pc.iceConnectionState}`);
+          if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+            setDimension('d3', 'pass', `已连接 (${pc.iceConnectionState})`);
+            startRtpStatsMonitor(() => remoteAudioDetected);
+          } else if (pc.iceConnectionState === 'failed') {
+            setDimension('d3', 'fail', '连接失败 (failed)');
+          }
+        };
+
+        // 维度 4: 建立 DataChannel
+        dc = pc.createDataChannel('oai-events');
+        dc.onopen = () => {
+          log('  -> [PASS] DataChannel (oai-events) 状态流转至 OPEN!');
+          setDimension('d4', 'pass', 'Open (已打开)');
+          // v2.8 关键时序门控：连接就绪立即激活音轨，生产模式下绝不等待 session.created
+          if (audioTrack && !audioTrack.enabled) {
+            audioTrack.enabled = true;
+            log('  -> [v2.8 门控时序] DataChannel 已打开，麦克风音轨已解除静音 (enabled=true)，开始拾音！');
+          }
+        };
+        dc.onmessage = (msg) => {
+          try {
+            const evt = JSON.parse(msg.data);
+            log(`  -> [DataChannel 事件] ${evt.type}`);
+          } catch (e) {
+            log(`  -> [DataChannel 原始帧] ${msg.data.substring(0, 100)}...`);
+          }
+        };
+
+        // ── 步骤 4: 创建 Offer 并提交 /calls (Probe-A, Expected: HTTP 201) ──
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        log(`[Step 4] 本地 SDP Offer 已生成 (${offer.sdp.length} bytes)`);
+
+        log(`[Step 5] 发送 Probe-A (POST /openai/v1/realtime/calls, Content-Type: application/sdp)...`);
+        const callRes = await fetch(`${endpoint}/openai/v1/realtime/calls`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${ephemeralKey}`,
+            'Content-Type': 'application/sdp'
+          },
+          body: offer.sdp
+        });
+
+        // 维度 1 校验
+        if (callRes.status === 201) {
+          log(`[维度 1 PASS] 收到 HTTP 201 Created (Content-Type: ${callRes.headers.get('content-type')})`);
+          setDimension('d1', 'pass', 'HTTP 201 Created');
+        } else {
+          const errText = await callRes.text();
+          setDimension('d1', 'fail', `HTTP ${callRes.status}`);
+          throw new Error(`/calls 拒绝请求 (返回 HTTP ${callRes.status}, 预期 201): ${errText}`);
+        }
+
+        // 维度 2 校验
+        setDimension('d2', 'running', '解析 SDP...');
+        const answerSdp = await callRes.text();
+        if (!answerSdp.includes('v=0') || !answerSdp.includes('m=audio')) {
+          setDimension('d2', 'fail', '语法非法');
+          throw new Error('SDP Answer 缺少标准的 v=0 / m=audio 结构');
+        }
+        await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+        log('[维度 2 PASS] SDP Answer 语法合法且已完成 setRemoteDescription！');
+        setDimension('d2', 'pass', 'SDP Answer 合法已接受');
+
+        setDimension('d3', 'running', 'ICE 协商中...');
+        setDimension('d4', 'running', '等待通道建立...');
+        setDimension('d5', 'running', '等待媒体数据包...');
+
+      } catch (err) {
+        log(`[ERROR] 探测终止: ${err.message}`);
+      } finally {
+        document.getElementById('btnRun').disabled = false;
+      }
+    }
+
+    // ── 维度 5: RTP 双向媒体传输与真实音频播放实时监测 ──
+    function startRtpStatsMonitor(isAudioDetected) {
+      if (statsTimer) clearInterval(statsTimer);
+      let outOk = false;
+      let inOk = false;
+      let prevBytesSent = 0;
+      let prevBytesReceived = 0;
+      let bytesSentGrowing = false;
+      let bytesReceivedGrowing = false;
+
+      statsTimer = setInterval(async () => {
+        if (!pc) return;
+        const stats = await pc.getStats();
+        stats.forEach(report => {
+          if (report.type === 'outbound-rtp' && report.kind === 'audio') {
+            document.getElementById('outPackets').textContent = `${report.packetsSent || 0} (${Math.round((report.bytesSent || 0) / 1024)} KB)`;
+            if (report.packetsSent > 10) outOk = true;
+            if (report.bytesSent > prevBytesSent && prevBytesSent > 0) bytesSentGrowing = true;
+            prevBytesSent = report.bytesSent || 0;
+          }
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            document.getElementById('inPackets').textContent = `${report.packetsReceived || 0} (${Math.round((report.bytesReceived || 0) / 1024)} KB)`;
+            if (report.packetsReceived > 10) inOk = true;
+            if (report.bytesReceived > prevBytesReceived && prevBytesReceived > 0) bytesReceivedGrowing = true;
+            prevBytesReceived = report.bytesReceived || 0;
+          }
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            document.getElementById('candRtt').textContent = Math.round((report.currentRoundTripTime || 0) * 1000);
+          }
+        });
+
+        const hasAudio = isAudioDetected && isAudioDetected();
+
+        if (outOk && inOk && bytesSentGrowing && bytesReceivedGrowing && hasAudio) {
+          setDimension('d5', 'pass', '双向 RTP 闭环 + 真实音频发声');
+          log('[维度 5 PASS] 检测到双向音频 RTP 持续增长且 Web Audio 捕获有效非零样本振幅，有效语音闭环成立！');
+          clearInterval(statsTimer);
+        } else if (outOk && inOk) {
+          setDimension('d5', 'running', hasAudio ? '数据增长中...' : '已收发 RTP 包，等待真实语音发声(请对麦克风说话)...');
+        } else if (outOk && !inOk) {
+          setDimension('d5', 'running', '仅上行推流，等待 AI 响应下行包...');
+        }
+      }, 800);
+    }
+  </script>
+</body>
+</html>

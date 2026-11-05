@@ -1,0 +1,10 @@
+@host = http://localhost:5266
+
+GET {{host}}/health
+
+###
+
+POST {{host}}/api/realtime/session
+Content-Type: application/json
+
+{ "mode": "adult", "voice": "marin" }

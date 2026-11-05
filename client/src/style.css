@@ -1,0 +1,108 @@
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body,
+#app {
+  height: 100%;
+}
+body {
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI',
+    Roboto, sans-serif;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+button,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* ── 设计令牌 ──
+   成人 = 深色、克制、暖琥珀色点缀；孩子 = 奶油色、圆润、更大的字。
+   正文对比度均 ≥ 4.5:1。 */
+:root,
+[data-theme='adult'] {
+  --bg: #0e0f17;
+  --surface: #181a27;
+  --surface-2: #222537;
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #f1f2f7;
+  --text-2: #a7abc0; /* 在 --bg 上 ≈ 7.6:1 */
+  --accent: #ffb36b;
+  --accent-ink: #2a1600; /* 放在 accent 上的文字，≈ 10:1 */
+  --hear: #5eead4; /* “我听见你了”的反馈色 */
+  --danger: #ff6b6b;
+  --danger-ink: #2a0707;
+  --orb-a: #ffd29a;
+  --orb-b: #ff8a6b;
+  --orb-c: #c2417a;
+  --radius: 18px;
+  --fs-body: 17px;
+  --fs-caption: 20px;
+  --fs-head: 26px;
+  color-scheme: dark;
+}
+[data-theme='child'] {
+  --bg: #fff6e8;
+  --surface: #ffffff;
+  --surface-2: #ffeccd;
+  --line: rgba(80, 45, 10, 0.14);
+  --text: #3a2614;
+  --text-2: #7a5a3e; /* 在 --bg 上 ≈ 5.6:1 */
+  --accent: #ff7a3d;
+  --accent-ink: #2b1100;
+  --hear: #12a594;
+  --danger: #d8433f;
+  --danger-ink: #ffffff;
+  --orb-a: #ffe58a;
+  --orb-b: #ffb347;
+  --orb-c: #ff7a3d;
+  --radius: 26px;
+  --fs-body: 19px;
+  --fs-caption: 24px;
+  --fs-head: 30px;
+  color-scheme: light;
+}
+
+:focus-visible {
+  outline: 3px solid var(--hear);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
