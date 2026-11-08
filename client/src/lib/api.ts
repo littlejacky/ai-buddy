@@ -7,6 +7,7 @@ export interface SessionResponse {
   expiresAt: number
   businessSessionId: string
   azureSessionId?: string
+  applicationSessionId?: string
   endpoint: string
   /** 服务端对本次会话的时长上限（秒），0/缺省 = 不限 */
   maxSessionSeconds?: number

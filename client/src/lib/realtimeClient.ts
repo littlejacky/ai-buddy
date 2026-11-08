@@ -62,7 +62,10 @@ export class RealtimeClient implements VoiceClient {
     try {
       const session = await createSession({ mode: opts.mode, voice: opts.voice })
       if (!alive()) return
-      this.ev.onSessionInfo({ maxSeconds: session.maxSessionSeconds ?? 0 })
+      this.ev.onSessionInfo({
+        maxSeconds: session.maxSessionSeconds ?? 0,
+        applicationSessionId: session.applicationSessionId,
+      })
 
       // 麦克风授权弹窗没有时限，所以放在连接超时计时之前。
       this.mic = await navigator.mediaDevices.getUserMedia({
@@ -117,7 +120,7 @@ export class RealtimeClient implements VoiceClient {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
-      const res = await fetch(`${session.endpoint.replace(/\/+$/, '')}/openai/v1/realtime/calls`, {
+      const res = await fetch(`${session.endpoint.replace(/\/+$/, '')}/openai/v1/realtime/calls?webrtcfilter=on`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.ephemeralKey}`, 'Content-Type': 'application/sdp' },
         body: offer.sdp,

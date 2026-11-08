@@ -53,3 +53,8 @@ secrets/
 publish/
 *.zip
 server/Buddy.Api/wwwroot/
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal

@@ -8,6 +8,7 @@ const emit = defineEmits<{
   'update:voice': [Voice]
   'update:captions': [boolean]
   'switch-mode': [Mode]
+  'open-parent-dashboard': []
 }>()
 </script>
 
@@ -72,6 +73,13 @@ const emit = defineEmits<{
     </section>
 
     <section>
+      <h3>家长中心</h3>
+      <button type="button" class="parent-center-btn" @click="emit('open-parent-dashboard')">
+        👨‍👩‍👧 家长成长陪伴中心（简报 / 记忆 / 权限）
+      </button>
+    </section>
+
+    <section>
       <h3>隐私</h3>
       <p class="hint">
         你的语音会通过加密连接发送到云端 AI 进行处理。本应用不保存录音，对话文字只留在当前页面。
@@ -98,6 +106,23 @@ h3 {
   color: var(--text-2);
   font-size: 14px;
   margin-top: 10px;
+}
+.parent-center-btn {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+.parent-center-btn:hover {
+  background: var(--surface-3);
+  border-color: var(--accent);
 }
 .seg {
   display: grid;

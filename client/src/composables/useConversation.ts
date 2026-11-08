@@ -33,14 +33,35 @@ export function useConversation(opts: ConversationOptions) {
   const lastDuration = ref(0)
   const debugStats = ref<DebugStats | null>(null)
   const wrapped = ref(false)
+  const currentAppSessionId = ref<string | null>(null)
 
   let clockTimer: ReturnType<typeof setInterval> | null = null
+
+  async function finalizeSession(sessionId: string, duration: number, finalTurns: Turn[]) {
+    try {
+      await fetch(`/api/sessions/${sessionId}/finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          durationSeconds: duration,
+          finalTurns,
+        }),
+      })
+    } catch (e) {
+      console.warn('Failed to finalize session', e)
+    }
+  }
 
   const events: VoiceClientEvents = {
     onState: (s) => {
       state.value = s
       if (s === 'listening' && !clockTimer) startClock()
-      if (s === 'ended' || s === 'error') stopClock()
+      if (s === 'ended' || s === 'error') {
+        stopClock()
+        if (currentAppSessionId.value) {
+          void finalizeSession(currentAppSessionId.value, elapsed.value, [...turns])
+        }
+      }
     },
     onTurn: (p) => {
       const i = turns.findIndex((t) => t.id === p.id)
@@ -59,6 +80,7 @@ export function useConversation(opts: ConversationOptions) {
     },
     onSessionInfo: (i) => {
       maxSeconds.value = i.maxSeconds
+      if (i.applicationSessionId) currentAppSessionId.value = i.applicationSessionId
     },
     onAudioBlocked: (b) => {
       audioBlocked.value = b

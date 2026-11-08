@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import BuddyCanvasRenderer from './buddy-canvas/BuddyCanvasRenderer.vue'
+import type { BuddyActivity } from './buddy-canvas/types'
 import ParentGate from './components/ParentGate.vue'
 import SettingsSheet from './components/SettingsSheet.vue'
 import TranscriptSheet from './components/TranscriptSheet.vue'
@@ -7,6 +9,7 @@ import VoiceOrb from './components/VoiceOrb.vue'
 import { useConversation } from './composables/useConversation'
 import { useSettings } from './composables/useSettings'
 import type { Mode } from './lib/types'
+import ParentDashboard from './views/ParentDashboard.vue'
 
 const params = new URLSearchParams(location.search)
 const settings = useSettings()
@@ -18,7 +21,9 @@ const conv = useConversation({
 
 const showTranscript = ref(false)
 const showSettings = ref(false)
-const gate = ref<null | 'settings' | 'adult'>(null)
+const showParentDashboard = ref(false)
+const currentActivity = ref<BuddyActivity | null>(null)
+const gate = ref<null | 'settings' | 'adult' | 'parent-dashboard'>(null)
 
 const isChild = computed(() => settings.mode === 'child')
 const idleLike = computed(() => ['idle', 'ended', 'error'].includes(conv.state.value))
@@ -102,12 +107,65 @@ function openSettings() {
   if (isChild.value) gate.value = 'settings'
   else showSettings.value = true
 }
+function openParentDashboard() {
+  showSettings.value = false
+  if (isChild.value) gate.value = 'parent-dashboard'
+  else showParentDashboard.value = true
+}
 function gatePassed() {
   const g = gate.value
   gate.value = null
   if (g === 'adult') settings.mode = 'adult'
   if (g === 'settings') showSettings.value = true
+  if (g === 'parent-dashboard') showParentDashboard.value = true
 }
+
+// ── 知识问答与探索卡片响应 ──
+watch(
+  () => lastTurn.value?.text,
+  (t) => {
+    if (!t) return
+    if (t.includes('鲸鱼') || t.includes('大象') || t.includes('蓝鲸')) {
+      currentActivity.value = {
+        schemaVersion: '1.0',
+        activityId: 'act_whale_' + Date.now(),
+        sessionId: 'sess_active',
+        kind: 'knowledge',
+        title: '谁是海洋里的巨无霸？',
+        blocks: [
+          {
+            type: 'knowledge',
+            title: '蓝鲸：地球上最大的动物',
+            content: '蓝鲸长达 30 多米，体重超过 150 吨，舌头就有一头大象那么重！',
+            factPoint: '因为海水有巨大浮力支撑身体，所以能长这么大哦！',
+            source: '海洋百科全书',
+          },
+        ],
+      }
+    } else if (t.includes('恐龙') || t.includes('霸王龙')) {
+      currentActivity.value = {
+        schemaVersion: '1.0',
+        activityId: 'act_dino_' + Date.now(),
+        sessionId: 'sess_active',
+        kind: 'quiz',
+        title: '恐龙小达人挑战',
+        blocks: [
+          {
+            type: 'quiz',
+            question: '下面哪种恐龙是生活在白垩纪晚期的超级肉食恐龙？',
+            options: [
+              { id: 'a', label: '霸王龙 (T-Rex)' },
+              { id: 'b', label: '腕龙' },
+              { id: 'c', label: '剑龙' },
+            ],
+            correctOptionId: 'a',
+            explanation: '霸王龙咬合力惊人，是白垩纪晚期的陆地霸主！腕龙生活在侏罗纪，而且是植食性的哦。',
+          },
+        ],
+      }
+    }
+  },
+)
 
 // 切换主题色时同步浏览器 UI 颜色
 watch(
@@ -171,6 +229,12 @@ watch(
       <button v-if="conv.audioBlocked.value" class="audio-blocked" type="button" @click="conv.resumeAudio()">
         🔈 点一下，打开声音
       </button>
+
+      <!-- BuddyCanvas: 动态互动与知识卡片 -->
+      <BuddyCanvasRenderer
+        :activity="currentActivity"
+        @dismiss="currentActivity = null"
+      />
     </main>
 
     <footer class="dock">
@@ -229,8 +293,10 @@ watch(
       @update:voice="settings.voice = $event"
       @update:captions="settings.captions = $event"
       @switch-mode="chooseMode"
+      @open-parent-dashboard="openParentDashboard"
     />
     <ParentGate :open="gate !== null" @close="gate = null" @pass="gatePassed" />
+    <ParentDashboard v-if="showParentDashboard" @close="showParentDashboard = false" />
   </div>
 </template>
 

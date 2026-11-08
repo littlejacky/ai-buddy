@@ -56,6 +56,7 @@ export interface StartOptions {
 export interface SessionInfo {
   /** 服务端下发的本次会话时长上限（秒），0 = 不限 */
   maxSeconds: number
+  applicationSessionId?: string
 }
 
 export interface DebugStats {
